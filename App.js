@@ -2,23 +2,32 @@ import React from "react";
 import {
   StyleSheet,
   View,
+  Image,
   Text,
   Platform,
   KeyboardAvoidingView,
-  ImageBackground
+  ImageBackground,
+  ActivityIndicator,
+  StatusBar
 } from "react-native";
 
 import SearchInput from "./components/SearchInput";
-import { unsplash } from "./utils/api";
+import { unsplash, fetchLocationId, fetchWeather, getIcon } from "./utils/api";
 import ImageLoad from "react-native-image-placeholder";
 
 export default class App extends React.Component {
   state = {
-    photo: null
+    loading: false,
+    error: false,
+    photo: [],
+    location: "Los Angeles",
+    temperature: 0,
+    weather: "",
+    weather_abbr: ""
   };
 
   componentDidMount() {
-    this.getPhotoByCity("san francisco", 1);
+    this.getPhotoByCity(this.state.location, 1);
   }
 
   getPhotoByCity(city, numPage) {
@@ -27,55 +36,115 @@ export default class App extends React.Component {
       .then(response => response.json())
       .then(json => {
         this.setState({
-          photo: json.results[0]
+          photo: json.results
         });
-        console.log(this.state.photo);
       });
   }
 
+  handleUpdateLocation = async city => {
+    if (!city) return;
+
+    this.setState({ loading: true }, async () => {
+      try {
+        const locationId = await fetchLocationId(city);
+        const data = await fetchWeather(locationId);
+        const { title, consolidated_weather } = data;
+        const {
+          weather_state_name,
+          the_temp,
+          weather_state_abbr
+        } = consolidated_weather[0];
+
+        this.getPhotoByCity(title, 1);
+
+        this.setState({
+          loading: false,
+          error: false,
+          location: title,
+          weather: weather_state_name,
+          temperature: the_temp,
+          weather_abbr: weather_state_abbr
+        });
+      } catch (e) {
+        this.setState({
+          loading: false,
+          error: true
+        });
+      }
+    });
+  };
+
   render() {
-    if (!this.state.photo) {
+    const {
+      location,
+      loading,
+      error,
+      weather,
+      weather_abbr,
+      temperature
+    } = this.state;
+
+    if (!this.state.photo.length > 0) {
+      return null;
+    } else {
       return (
         <KeyboardAvoidingView style={styles.container} behavior="padding">
+          <StatusBar barStyle="light-content" />
           <ImageBackground
-            source="https://duranvirginia.files.wordpress.com/2014/02/virginia-duran-blog-10-sites-to-take-the-best-skyline-pictures-in-san-francisco-mandarin-oriental-at-dusk.jpg"
+            source={{ uri: this.state.photo[0].urls.full }}
             style={styles.imageContainer}
             imageStyle={styles.image}
           >
             <View style={styles.detailsContainer}>
-              <Text style={[styles.largeText, styles.textStyle]}>
-                San Francisco
-              </Text>
-              <Text style={[styles.smallText, styles.textStyle]}>
-                Light Cloud2
-              </Text>
-              <Text style={[styles.largeText, styles.textStyle]}>24°</Text>
-              <SearchInput placeholder="Search any city" />
+              <ActivityIndicator
+                animating={loading}
+                color="white"
+                size="large"
+              />
+              {!loading && (
+                <View>
+                  {error && (
+                    <Text style={[styles.smallText, styles.textStyle]}>
+                      Could not load weather, please try a different city.
+                    </Text>
+                  )}
+
+                  {!error && (
+                    <View>
+                      <Text style={[styles.largeText, styles.textStyle]}>
+                        {location}
+                      </Text>
+                      <View
+                        style={{
+                          flex: 1,
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "space-around"
+                        }}
+                      >
+                        <Text style={[styles.smallText, styles.textStyle]}>
+                          {weather}
+                        </Text>
+                      </View>
+
+                      {temperature === 0 ? null : (
+                        <Text
+                          style={[styles.largeText, styles.textStyle]}
+                        >{`${Math.round(temperature)}°`}</Text>
+                      )}
+                    </View>
+                  )}
+                  <SearchInput
+                    placeholder="Search any city"
+                    onSubmit={this.handleUpdateLocation}
+                  />
+                </View>
+              )}
             </View>
           </ImageBackground>
         </KeyboardAvoidingView>
       );
     }
-    return (
-      <KeyboardAvoidingView style={styles.container} behavior="padding">
-        <ImageBackground
-          source={this.state.photo.urls.full}
-          style={styles.imageContainer}
-          imageStyle={styles.image}
-        >
-          <View style={styles.detailsContainer}>
-            <Text style={[styles.largeText, styles.textStyle]}>
-              San Francisco
-            </Text>
-            <Text style={[styles.smallText, styles.textStyle]}>
-              Light Cloud2
-            </Text>
-            <Text style={[styles.largeText, styles.textStyle]}>24°</Text>
-            <SearchInput placeholder="Search any city" />
-          </View>
-        </ImageBackground>
-      </KeyboardAvoidingView>
-    );
   }
 }
 
@@ -89,18 +158,29 @@ const styles = StyleSheet.create({
   },
   image: {
     flex: 1,
-    width: null,
-    height: null,
+    width: "100%",
+    height: "100%",
     resizeMode: "cover"
+  },
+  detailsContainer: {
+    flex: 1,
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.2)",
+    paddingHorizontal: 20
   },
   textStyle: {
     textAlign: "center",
-    fontFamily: Platform.OS === "ios" ? "AvenirNext-Regular" : "Roboto"
+    fontFamily: Platform.OS === "ios" ? "AvenirNext-Regular" : "Roboto",
+    color: "white"
   },
   largeText: {
     fontSize: 44
   },
   smallText: {
     fontSize: 18
+  },
+  icon: {
+    width: 50,
+    height: 50
   }
 });
