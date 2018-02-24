@@ -114,18 +114,9 @@ export default class App extends React.Component {
                       <Text style={[styles.largeText, styles.textStyle]}>
                         {location}
                       </Text>
-                      <View
-                        style={{
-                          flex: 1,
-                          flexDirection: "column",
-                          alignItems: "center",
-                          justifyContent: "space-around"
-                        }}
-                      >
-                        <Text style={[styles.smallText, styles.textStyle]}>
-                          {weather}
-                        </Text>
-                      </View>
+                      <Text style={[styles.smallText, styles.textStyle]}>
+                        {weather}
+                      </Text>
 
                       {temperature === 0 ? null : (
                         <Text
